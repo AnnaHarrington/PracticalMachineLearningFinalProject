@@ -1,0 +1,78 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Anna Harrington"
+date: "5/10/2020"
+output: html_document
+---
+
+## Introduction
+
+For this project, my goal was to use data from accelerometers on the belt, forearm, arm and dumbbell for six study participants to quantify how well they performed barbell lifts.  This report will go over how I built my machine learning model, how I used cross validation, my expected out of sample error, and the reasoning behind each.  After performing this analysis, I will apply my prediction model to predict 20 different test cases. 
+
+## Analysis
+
+### Cleaning the Data and Cross Validation
+  First, I loaded in the training and testing data provided in the instructions using the read.csv function and set the seed for the project as 1993 using the set.seed function.  Then I removed the first seven columns of both data frames as they were not relevant to the exercise.  Next, I cleaned up the data sets by removing all columns where the majority (more than 90%) of the data was NA values using the sapply, mean, and is.na functions.  
+  Next, I applied cross validation.  The reasoning behind this is that cross validation allows me to evaluate the model with the limited data set that is provided in this assignment. I did this using the createDataPartition function.  I split the trainingdata data frame using a p value of 0.7 to create two data frames- trainingdata and testingdatasplut. The code for this is shown below.   
+
+```{r}
+library(caret)
+library(corrplot)
+library(e1071)
+library(randomForest)
+set.seed(1993)
+trainingdatain <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"))
+testingdatain  <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"))
+
+trainingdata <- trainingdatain
+testingdata <- testingdatain
+
+trainingdata <- trainingdata[, -c(1:7)]
+testingdata <- testingdata[, -c(1:7)]
+naremove    <- sapply(trainingdata, function(x) mean(is.na(x))) > 0.9
+trainingdata <- trainingdata[, naremove==FALSE]
+testingdata  <- testingdata[, naremove==FALSE]
+
+intrain <- createDataPartition(trainingdata$classe, p=0.7, list=FALSE)
+trainingdata <- trainingdata[intrain, ]
+testingdatasplit <- trainingdata[-intrain, ]
+
+near0variance <- nearZeroVar(trainingdata)
+trainingdata <- trainingdata[, -near0variance]
+testingdatasplit  <- testingdatasplit[, -near0variance]
+```
+
+### Random Forest Model
+  Next I built a random forest model for the data.  I chose to use the random forest modeling technique because according to my lecture notes from week three of this course, random forest is the most accurate.  The cons of using random forest are the speed, interpretability, and overfitting; for this assignment, the accuracy outweighed all the listed cons.  
+  First I used the cor and corrplot functions to create a plot showing the correlations between variables in the trainingdata data frame.  Then I used the trainControl and train functions to build the random forest model (randomforest1).  Next I used the predict and confusionMatrix functions to generate randomforest3.  
+
+```{r}
+correlation <- cor(trainingdata[, -53])
+
+corrplot(correlation, order = "FPC", method = "color", type = "lower", 
+         tl.cex = 0.8 , tl.col = rgb(0, 0, 0))
+
+
+randomforest <- trainControl(method="cv", number=3, verboseIter=FALSE)
+randomforest1 <- train(classe ~., data=trainingdata, trControl=randomforest)
+print(randomforest1$finalModel)
+
+randomforest2 <- predict(randomforest1, newdata=testingdatasplit)
+randomforest3 <- confusionMatrix(randomforest2, testingdatasplit$class)
+print(randomforest3)
+```
+
+### Expected Out of Sample Error
+  The plotted accuracy of the random forest model is shown below.  According to the output the accuracy of the random forest model is 1.  The fact that the value is so high could be due to overfitting (which is one of the problems with random forest models).  Based on this the out of sample error for the random forest model is 0.  The reasoning behind this is that the out of sample error is equal to one minus the accuracy of the model.
+```{r}
+plot(randomforest3$table, col=randomforest3$byClass, main="Random Forest Accuracy")
+```
+
+## Results
+  For this assignment, I built a random forest model to predict how well six study participants performed barbell lifts using data from accelerometers placed on the belt, forearm, arm, and dumbbell.  Cross validation was applied to allow for model evaluation.  The expected out of sample error is 0 because the accuracy of the random forest model is 1 (although this may be due to overfitting).  Finally, I applied the random forest model to the testing data set provided to generate results for the quiz portion of the assignment.  The results are shown below.
+
+```{r}
+randomforest4 <- predict(randomforest1, newdata=testingdata)
+print(randomforest4)
+```
+  
